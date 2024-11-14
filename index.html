@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Rhythm Game Prototype</title>
+    <style>
+        #gameCanvas {
+            border: 2px solid white;  /* 테두리를 더 뚜렷하게 */
+            background-color: #000;
+            margin: 20px;             /* 여백 추가 */
+        }
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #222;   /* 배경색을 더 어둡게 */
+        }
+        #startText {
+            position: absolute;
+            color: white;
+            font-family: Arial, sans-serif;
+            font-size: 24px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div id="startText">Press SPACE to start</div>
+    <canvas id="gameCanvas" width="400" height="600"></canvas>
+    <script src="game.js"></script>
+</body>
+</html>
