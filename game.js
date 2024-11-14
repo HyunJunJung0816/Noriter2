@@ -22,11 +22,43 @@ class RhythmGame {
         this.particles = [];
         this.hitEffects = [];
 
+        // 판정 텍스트 관련 속성
+        this.judgmentText = '';
+        this.judgmentTimer = 0;
+        this.judgmentColor = '#ffffff';
+        
+        // 판정 시간 설정 (밀리초)
+        this.timings = {
+            perfect: 50,  // 0.05초
+            good: 100,    // 0.1초
+            bad: 200      // 0.2초
+        };
+
+        // 점수 관련 속성
+        this.score = 0;
+        this.combo = 0;
+        this.maxCombo = 0;
+        
+        // 판정 통계
+        this.stats = {
+            perfect: 0,
+            good: 0,
+            bad: 0,
+            miss: 0
+        };
+
+        // 점수 설정
+        this.scorePoints = {
+            perfect: 1000,
+            good: 500,
+            bad: 100
+        };
+
         // 이벤트 리스너
         document.addEventListener('keydown', this.handleKeyDown.bind(this));
         document.addEventListener('keyup', this.handleKeyUp.bind(this));
         
-        // 게임 시작 (테스트를 위해 바로 시작)
+        // 게임 시작
         this.isPlaying = true;
         this.gameLoop();
         
@@ -81,7 +113,6 @@ class RhythmGame {
             const lane = this.keyMap[event.key];
             this.activeLanes[lane] = true;
             
-            // 파티클 생성
             const x = lane * this.laneWidth + this.laneWidth / 2;
             const y = this.canvas.height - 50;
             this.createParticles(x, y);
@@ -99,16 +130,49 @@ class RhythmGame {
 
     checkHit(lane) {
         const hitZone = this.canvas.height - 50;
-        const hitThreshold = 30;
+        const hitThreshold = this.timings.bad;
 
         for (let i = this.notes.length - 1; i >= 0; i--) {
             const note = this.notes[i];
             if (note.lane === lane) {
                 const distance = Math.abs(note.y - hitZone);
+                
                 if (distance < hitThreshold) {
+                    let judgment = '';
+                    let color = '';
+                    let points = 0;
+                    
+                    if (distance < this.timings.perfect) {
+                        judgment = 'PERFECT!';
+                        color = '#00ffff';
+                        points = this.scorePoints.perfect;
+                        this.combo++;
+                        this.stats.perfect++;
+                    } else if (distance < this.timings.good) {
+                        judgment = 'GOOD!';
+                        color = '#00ff00';
+                        points = this.scorePoints.good;
+                        this.combo++;
+                        this.stats.good++;
+                    } else {
+                        judgment = 'BAD';
+                        color = '#ff0000';
+                        points = this.scorePoints.bad;
+                        this.combo = 0;
+                        this.stats.bad++;
+                    }
+                    
+                    const comboBonus = 1 + (Math.floor(this.combo / 10) * 0.1);
+                    this.score += Math.floor(points * comboBonus);
+                    
+                    this.maxCombo = Math.max(this.maxCombo, this.combo);
+                    
+                    this.judgmentText = judgment;
+                    this.judgmentTimer = 30;
+                    this.judgmentColor = color;
+                    
                     this.createHitEffect(lane);
                     this.notes.splice(i, 1);
-                    console.log('Hit!');
                     return;
                 }
             }
@@ -119,9 +183,13 @@ class RhythmGame {
         // 노트 업데이트
         this.notes.forEach((note, index) => {
             note.y += note.speed;
-            if (note.y > this.canvas.height) {
+            if (note.y > this.canvas.height - 40) {
+                this.judgmentText = 'MISS';
+                this.judgmentTimer = 30;
+                this.judgmentColor = '#888888';
+                this.combo = 0;
+                this.stats.miss++;
                 this.notes.splice(index, 1);
-                console.log('Miss!');
             }
         });
 
@@ -139,6 +207,11 @@ class RhythmGame {
             effect.opacity -= 0.05;
             return effect.opacity > 0;
         });
+
+        // 판정 텍스트 타이머 업데이트
+        if (this.judgmentTimer > 0) {
+            this.judgmentTimer--;
+        }
     }
 
     draw() {
@@ -146,11 +219,9 @@ class RhythmGame {
 
         // 레인 그리기
         for (let i = 0; i < this.lanes; i++) {
-            // 레인 배경
             this.ctx.fillStyle = this.activeLanes[i] ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.8)';
             this.ctx.fillRect(i * this.laneWidth, 0, this.laneWidth, this.canvas.height);
             
-            // 레인 구분선
             if (i > 0) {
                 this.ctx.beginPath();
                 this.ctx.moveTo(i * this.laneWidth, 0);
@@ -197,13 +268,63 @@ class RhythmGame {
             const x = i * this.laneWidth + this.laneWidth / 2;
             const y = this.canvas.height - 20;
             
-            // 키 버튼 배경
             this.ctx.fillStyle = this.activeLanes[i] ? '#fff' : '#333';
             this.ctx.fillRect(x - 15, y - 20, 30, 30);
             
-            // 키 텍스트
             this.ctx.fillStyle = this.activeLanes[i] ? '#000' : '#fff';
-            this.ctx.fillText(keys[i], x - 10, y);
+            this.ctx.textAlign = 'center';
+            this.ctx.fillText(keys[i], x, y);
+        }
+
+        // 판정 텍스트 그리기
+        if (this.judgmentTimer > 0) {
+            this.ctx.save();
+            this.ctx.fillStyle = this.judgmentColor;
+            this.ctx.font = 'bold 36px Arial';
+            this.ctx.textAlign = 'center';
+            
+            const textX = this.canvas.width / 2;
+            const textY = this.canvas.height - 100;
+            
+            const scale = 1 + (this.judgmentTimer / 30) * 0.5;
+            const alpha = this.judgmentTimer / 30;
+            
+            this.ctx.globalAlpha = alpha;
+            this.ctx.scale(scale, scale);
+            this.ctx.fillText(this.judgmentText, textX / scale, textY / scale);
+            this.ctx.restore();
+        }
+
+        // 점수와 콤보 표시
+        this.ctx.fillStyle = '#ffffff';
+        this.ctx.font = '24px Arial';
+        this.ctx.textAlign = 'left';
+        this.ctx.fillText(`Score: ${this.score.toLocaleString()}`, 10, 30);
+        
+        if (this.combo > 0) {
+            this.ctx.font = '36px Arial';
+            this.ctx.textAlign = 'center';
+            this.ctx.fillText(`${this.combo} COMBO!`, this.canvas.width / 2, 50);
+        }
+
+        // 판정 통계 표시
+        this.ctx.font = '16px Arial';
+        this.ctx.textAlign = 'right';
+        this.ctx.fillStyle = '#00ffff';
+        this.ctx.fillText(`Perfect: ${this.stats.perfect}`, this.canvas.width - 10, 30);
+        this.ctx.fillStyle = '#00ff00';
+        this.ctx.fillText(`Good: ${this.stats.good}`, this.canvas.width - 10, 50);
+        this.ctx.fillStyle = '#ff0000';
+        this.ctx.fillText(`Bad: ${this.stats.bad}`, this.canvas.width - 10, 70);
+        this.ctx.fillStyle = '#888888';
+        this.ctx.fillText(`Miss: ${this.stats.miss}`, this.canvas.width - 10, 90);
+        this.ctx.fillStyle = '#ffffff';
+        this.ctx.fillText(`Max Combo: ${this.maxCombo}`, this.canvas.width - 10, 110);
+
+        const totalNotes = this.stats.perfect + this.stats.good + this.stats.bad + this.stats.miss;
+        if (totalNotes > 0) {
+            const accuracy = ((this.stats.perfect + this.stats.good * 0.7) / totalNotes * 100).toFixed(2);
+            this.ctx.fillText(`Accuracy: ${accuracy}%`, this.canvas.width - 10, 130);
         }
     }
 
